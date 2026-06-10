@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { useCartStore, useCartTotal } from '../store/useCartStore';
+import { useNavigate } from 'react-router-dom';
 
 export default function Cart() {
   const isCartOpen = useCartStore(state => state.isCartOpen);
@@ -14,6 +15,7 @@ export default function Cart() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [formData, setFormData] = useState({ customerName: '', tableOrAddress: '', phone: '' });
   const [orderStatus, setOrderStatus] = useState(null); // 'loading', 'success', 'error'
+  const navigate = useNavigate();
 
   const handleCheckout = async (e) => {
     e.preventDefault();
@@ -32,12 +34,15 @@ export default function Cart() {
       
       if (!response.ok) throw new Error('Failed to submit order');
       
+      localStorage.setItem('customerPhone', formData.phone);
+      
       setOrderStatus('success');
       clearCart();
       setTimeout(() => {
         setIsCartOpen(false);
         setOrderStatus(null);
         setIsCheckingOut(false);
+        navigate('/my-orders');
       }, 3000);
     } catch (error) {
       console.error(error);

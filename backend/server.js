@@ -163,8 +163,15 @@ app.post('/api/orders', (req, res) => {
 
 // Get all orders (for admin panel)
 app.get('/api/orders', (req, res) => {
-  // Sort by newest first
+  // Sort orders by newest first
   const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json(sortedOrders);
+});
+
+// Fetch orders for a specific customer by phone
+app.get('/api/orders/customer/:phone', (req, res) => {
+  const customerOrders = orders.filter(o => o.phone === req.params.phone);
+  const sortedOrders = [...customerOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json(sortedOrders);
 });
 
