@@ -3,8 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
-const Razorpay = require('razorpay');
-const crypto = require('crypto');
+const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,10 +14,7 @@ const io = new Server(server, {
   }
 });
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder_key_id',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_secret'
-});
+const KHALTI_SECRET_KEY = process.env.KHALTI_SECRET_KEY || 'test_secret_key_placeholder';
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -38,7 +34,7 @@ const menuItems = [
     category: 'Pizza',
     name: 'Margherita Suprema',
     description: 'Classic delight with 100% real mozzarella cheese, fresh tomatoes, and basil on a hand-tossed crust.',
-    price: 14.99,
+    price: 1499,
     image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -46,7 +42,7 @@ const menuItems = [
     category: 'Pizza',
     name: 'Pepperoni Feast',
     description: 'Loaded with premium pepperoni, gooey cheese, and our signature rich tomato sauce.',
-    price: 16.99,
+    price: 1699,
     image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -54,7 +50,7 @@ const menuItems = [
     category: 'Pizza',
     name: 'Truffle Mushroom',
     description: 'Earthy mushrooms, truffle oil, roasted garlic, and a blend of savory artisan cheeses.',
-    price: 18.99,
+    price: 1899,
     image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -62,7 +58,7 @@ const menuItems = [
     category: 'Burger',
     name: 'Classic Cheeseburger',
     description: 'Juicy 100% Angus beef patty, cheddar cheese, crisp lettuce, tomato, and our secret sauce.',
-    price: 12.99,
+    price: 1299,
     image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -70,7 +66,7 @@ const menuItems = [
     category: 'Burger',
     name: 'Spicy Inferno Burger',
     description: 'Double beef patty, pepper jack cheese, jalapeños, and blazing habanero aioli.',
-    price: 15.49,
+    price: 1549,
     image: 'https://images.unsplash.com/photo-1594212848116-b8dbf932f94d?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -78,7 +74,7 @@ const menuItems = [
     category: 'Burger',
     name: 'Crispy Chicken Ranch',
     description: 'Golden fried chicken breast, smoked bacon, buttermilk ranch, and crisp pickles on a brioche bun.',
-    price: 13.99,
+    price: 1399,
     image: 'https://images.unsplash.com/photo-1615719413546-198b25453f85?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -86,7 +82,7 @@ const menuItems = [
     category: 'Cake',
     name: 'Velvet Dream Cake',
     description: 'Rich red velvet layers filled and frosted with smooth Madagascar vanilla cream cheese.',
-    price: 7.99,
+    price: 799,
     image: 'https://images.unsplash.com/photo-1616541823729-00fe0aacd32c?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -94,7 +90,7 @@ const menuItems = [
     category: 'Cake',
     name: 'Dark Chocolate Truffle',
     description: 'Decadent dark chocolate ganache over a moist fudge cake. A chocolate lover’s fantasy.',
-    price: 8.49,
+    price: 849,
     image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -102,7 +98,7 @@ const menuItems = [
     category: 'Cake',
     name: 'Classic Cheesecake',
     description: 'New York style vanilla cheesecake on a buttery graham cracker crust with a strawberry glaze.',
-    price: 7.49,
+    price: 749,
     image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -110,7 +106,7 @@ const menuItems = [
     category: 'Shake',
     name: 'Oreo Overload',
     description: 'Thick vanilla bean ice cream blended with chunks of Oreo cookies, topped with whipped cream.',
-    price: 6.99,
+    price: 699,
     image: 'https://images.unsplash.com/photo-1572490122747-3968b75bb8ef?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -118,7 +114,7 @@ const menuItems = [
     category: 'Shake',
     name: 'Strawberry Bliss',
     description: 'Fresh strawberries and premium strawberry ice cream, finished with a fresh berry compote.',
-    price: 6.49,
+    price: 649,
     image: 'https://images.unsplash.com/photo-1556881286-fc6915169721?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -126,7 +122,7 @@ const menuItems = [
     category: 'Shake',
     name: 'Double Fudge Brownie',
     description: 'Rich chocolate ice cream with fudge brownie pieces, chocolate syrup drizzle, and a cherry on top.',
-    price: 7.49,
+    price: 749,
     image: 'https://images.unsplash.com/photo-1577805947697-89e18249d767?auto=format&fit=crop&q=80&w=800'
   }
 ];
@@ -140,40 +136,57 @@ app.get('/api/menu', (req, res) => {
   res.json(menuItems);
 });
 
-// Razorpay Create Order
-app.post('/api/payments/create-order', async (req, res) => {
+// Khalti Initiate Order
+app.post('/api/payments/khalti/initiate', async (req, res) => {
   try {
-    const { amount } = req.body;
-    const options = {
-      amount: Math.round(amount * 100), // amount in smallest currency unit
-      currency: "USD",
-      receipt: `rcpt_${Date.now()}`
+    const { amount, purchase_order_id, purchase_order_name, customer_info } = req.body;
+    
+    const payload = {
+      return_url: "http://localhost:5173/", // URL to redirect back to
+      website_url: "http://localhost:5173",
+      amount: Math.round(amount * 100), // Khalti expects amount in paisa
+      purchase_order_id: purchase_order_id || `ord_${Date.now()}`,
+      purchase_order_name: purchase_order_name || "LuxeCafe Order",
+      customer_info: customer_info || {
+        name: "Customer",
+        email: "customer@example.com",
+        phone: "9800000000"
+      }
     };
-    const order = await razorpay.orders.create(options);
-    res.json(order);
+
+    const response = await axios.post('https://a.khalti.com/api/v2/epayment/initiate/', payload, {
+      headers: {
+        'Authorization': `Key ${KHALTI_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    res.json(response.data);
   } catch (error) {
-    console.error('Error creating Razorpay order:', error);
-    res.status(500).json({ error: 'Failed to create Razorpay order' });
+    console.error('Error initiating Khalti payment:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to initiate Khalti payment' });
   }
 });
 
-// Razorpay Verify Signature
-app.post('/api/payments/verify', (req, res) => {
+// Khalti Verify Payment
+app.post('/api/payments/khalti/verify', async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-    const sign = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSign = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_secret')
-      .update(sign.toString())
-      .digest("hex");
+    const { pidx } = req.body;
+    
+    const response = await axios.post('https://a.khalti.com/api/v2/epayment/lookup/', { pidx }, {
+      headers: {
+        'Authorization': `Key ${KHALTI_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-    if (razorpay_signature === expectedSign) {
-      return res.json({ message: "Payment verified successfully", success: true });
+    if (response.data.status === 'Completed') {
+      res.json({ message: "Payment verified successfully", success: true, data: response.data });
     } else {
-      return res.status(400).json({ error: "Invalid payment signature" });
+      res.status(400).json({ error: "Payment not completed", status: response.data.status });
     }
   } catch (error) {
-    console.error('Error verifying payment:', error);
+    console.error('Error verifying Khalti payment:', error.response?.data || error.message);
     res.status(500).json({ error: 'Failed to verify payment' });
   }
 });

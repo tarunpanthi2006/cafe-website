@@ -161,7 +161,7 @@ function MenuItemCard({ item, onAdd }) {
         <div className="p-6 flex flex-col flex-grow" style={{ transform: "translateZ(20px)" }}>
           <div className="flex justify-between items-start mb-2">
             <h3 className="text-xl font-bold text-white leading-tight">{item.name}</h3>
-            <span className="text-brand-orange font-bold text-xl ml-4">${item.price.toFixed(2)}</span>
+            <span className="text-brand-orange font-bold text-xl ml-4">Rs. {item.price}</span>
           </div>
           <p className="text-gray-400 text-sm mb-6 flex-grow">{item.description}</p>
           

@@ -124,12 +124,12 @@ export default function Admin() {
                     </div>
                     <div className="flex items-center gap-1 text-gray-400 text-sm">
                       <Clock className="w-4 h-4" />
-                      {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      {new Date(order.createdAt).toLocaleTimeString('en-US', { timeZone: 'Asia/Kathmandu', hour: '2-digit', minute:'2-digit'})}
                     </div>
                   </div>
                   <div className="text-right">
                     <span className="text-sm text-gray-400 block mb-1">Total</span>
-                    <span className="text-2xl font-bold text-brand-orange">${order.totalAmount.toFixed(2)}</span>
+                    <span className="text-2xl font-bold text-brand-orange">Rs. {order.totalAmount}</span>
                   </div>
                 </div>
 
@@ -170,7 +170,7 @@ export default function Admin() {
                           </span>
                           <span className="font-medium text-white">{item.name}</span>
                         </div>
-                        <span className="text-gray-400 font-medium">${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="text-gray-400 font-medium">Rs. {item.price * item.quantity}</span>
                       </div>
                     ))}
                   </div>

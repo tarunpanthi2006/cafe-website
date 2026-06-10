@@ -126,7 +126,7 @@ export default function MyOrders() {
                         </div>
                         <div className="text-right">
                           <p className="text-gray-400 text-sm mb-1">Total Amount</p>
-                          <p className="text-2xl font-bold text-brand-orange">${order.totalAmount.toFixed(2)}</p>
+                          <p className="text-2xl font-bold text-brand-orange">Rs. {order.totalAmount}</p>
                         </div>
                       </div>
 
@@ -139,7 +139,7 @@ export default function MyOrders() {
                               </div>
                               <div>
                                 <h4 className="font-bold text-white">{item.name}</h4>
-                                <p className="text-gray-400 text-sm">Qty: {item.quantity} × ${item.price.toFixed(2)}</p>
+                                <p className="text-gray-400 text-sm">Qty: {item.quantity} × Rs. {item.price}</p>
                               </div>
                             </div>
                           ))}
@@ -147,7 +147,7 @@ export default function MyOrders() {
                       </div>
                       
                       <div className="mt-6 flex items-center justify-between text-sm text-gray-500">
-                        <span>Placed at {new Date(order.createdAt).toLocaleTimeString()}</span>
+                        <span>Placed at {new Date(order.createdAt).toLocaleTimeString('en-US', { timeZone: 'Asia/Kathmandu' })}</span>
                         <span>{order.tableOrAddress}</span>
                       </div>
                     </div>

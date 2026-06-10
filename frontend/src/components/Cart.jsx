@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { useCartStore, useCartTotal } from '../store/useCartStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function Cart() {
   const isCartOpen = useCartStore(state => state.isCartOpen);
@@ -16,15 +16,65 @@ export default function Cart() {
   const [formData, setFormData] = useState({ customerName: '', tableOrAddress: '', phone: '' });
   const [orderStatus, setOrderStatus] = useState(null); // 'loading', 'success', 'error'
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const pidx = searchParams.get('pidx');
+    
+    if (pidx) {
+      verifyKhaltiPayment(pidx);
+    }
+  }, [location]);
+
+  const verifyKhaltiPayment = async (pidx) => {
+    try {
+      setIsCartOpen(true);
+      setOrderStatus('loading');
+      
+      const verifyData = await fetch('http://localhost:5001/api/payments/khalti/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pidx })
+      }).then(t => t.json());
+
+      if (verifyData.success) {
+        const savedForm = JSON.parse(localStorage.getItem('pendingOrderForm') || '{}');
+        const savedAmount = Number(localStorage.getItem('pendingOrderAmount') || 0);
+        
+        const finalResponse = await fetch('http://localhost:5001/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...savedForm,
+            items: cartItems.length > 0 ? cartItems : JSON.parse(localStorage.getItem('pendingCartItems') || '[]'),
+            totalAmount: savedAmount,
+            paymentId: pidx
+          })
+        });
+        
+        if (!finalResponse.ok) throw new Error('Failed to submit order');
+        
+        localStorage.setItem('customerPhone', savedForm.phone);
+        localStorage.removeItem('pendingOrderForm');
+        localStorage.removeItem('pendingOrderAmount');
+        localStorage.removeItem('pendingCartItems');
+        
+        setOrderStatus('success');
+        clearCart();
+        setTimeout(() => {
+          setIsCartOpen(false);
+          setOrderStatus(null);
+          navigate('/my-orders', { replace: true });
+        }, 3000);
+      } else {
+        throw new Error("Payment verification failed");
+      }
+    } catch (err) {
+      console.error(err);
+      setOrderStatus('error');
+      setTimeout(() => setOrderStatus(null), 3000);
+    }
   };
 
   const handleCheckout = async (e) => {
@@ -32,92 +82,28 @@ export default function Cart() {
     setOrderStatus('loading');
     
     try {
-      const res = await loadRazorpayScript();
-      if (!res) {
-        throw new Error("Razorpay SDK failed to load. Are you online?");
-      }
+      localStorage.setItem('pendingOrderForm', JSON.stringify(formData));
+      localStorage.setItem('pendingOrderAmount', cartTotal.toString());
+      localStorage.setItem('pendingCartItems', JSON.stringify(cartItems));
 
-      // 1. Create Order on Backend
-      const orderData = await fetch('http://localhost:5001/api/payments/create-order', {
+      const orderData = await fetch('http://localhost:5001/api/payments/khalti/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: cartTotal })
+        body: JSON.stringify({ 
+          amount: cartTotal,
+          customer_info: {
+            name: formData.customerName,
+            email: "customer@example.com",
+            phone: formData.phone || "9800000000"
+          }
+        })
       }).then(t => t.json());
 
-      if (!orderData || orderData.error) {
+      if (!orderData || orderData.error || !orderData.payment_url) {
         throw new Error(orderData.error || 'Failed to initialize payment');
       }
 
-      // 2. Open Razorpay UI
-      const options = {
-        key: 'rzp_test_placeholder_key_id', // Replace with real key via environment variables later
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: 'LuxeCafe',
-        description: 'Food Order Payment',
-        order_id: orderData.id,
-        handler: async function (response) {
-          try {
-            // 3. Verify Payment
-            const verifyData = await fetch('http://localhost:5001/api/payments/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(response)
-            }).then(t => t.json());
-
-            if (!verifyData.success) {
-              throw new Error("Payment verification failed");
-            }
-
-            // 4. Submit Final Order
-            const finalResponse = await fetch('http://localhost:5001/api/orders', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ...formData,
-                items: cartItems,
-                totalAmount: cartTotal,
-                paymentId: response.razorpay_payment_id
-              })
-            });
-            
-            if (!finalResponse.ok) throw new Error('Failed to submit order');
-            
-            localStorage.setItem('customerPhone', formData.phone);
-            
-            setOrderStatus('success');
-            clearCart();
-            setTimeout(() => {
-              setIsCartOpen(false);
-              setOrderStatus(null);
-              setIsCheckingOut(false);
-              navigate('/my-orders');
-            }, 3000);
-
-          } catch (err) {
-            console.error(err);
-            setOrderStatus('error');
-            setTimeout(() => setOrderStatus(null), 3000);
-          }
-        },
-        prefill: {
-          name: formData.customerName,
-          contact: formData.phone
-        },
-        theme: {
-          color: '#FF7F50' // brand-orange
-        }
-      };
-
-      const paymentObject = new window.Razorpay(options);
-      paymentObject.on('payment.failed', function (response) {
-        console.error(response.error);
-        setOrderStatus('error');
-        setTimeout(() => setOrderStatus(null), 3000);
-      });
-      
-      paymentObject.open();
-
+      window.location.href = orderData.payment_url;
     } catch (error) {
       console.error(error);
       setOrderStatus('error');
@@ -204,7 +190,7 @@ export default function Cart() {
                       value={formData.phone}
                       onChange={e => setFormData({...formData, phone: e.target.value})}
                       className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-orange focus:border-transparent outline-none transition-all"
-                      placeholder="(555) 123-4567"
+                      placeholder="9800000000"
                     />
                   </div>
                 </form>
@@ -215,7 +201,7 @@ export default function Cart() {
                       <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded-xl shadow-sm" />
                       <div className="flex-1">
                         <h3 className="font-bold text-brand-dark">{item.name}</h3>
-                        <p className="text-brand-orange font-medium">${item.price.toFixed(2)}</p>
+                        <p className="text-brand-orange font-medium">Rs. {item.price}</p>
                         <div className="flex items-center gap-3 mt-2">
                           <button 
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
@@ -248,7 +234,7 @@ export default function Cart() {
               <div className="border-t border-gray-100 p-6 bg-gray-50/50">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-gray-600 font-medium">Subtotal</span>
-                  <span className="text-xl font-bold text-brand-dark">${cartTotal.toFixed(2)}</span>
+                  <span className="text-xl font-bold text-brand-dark">Rs. {cartTotal}</span>
                 </div>
                 {orderStatus === 'error' && (
                   <p className="text-red-500 text-sm mb-4 text-center">Failed to process order. Try again.</p>
@@ -267,7 +253,7 @@ export default function Cart() {
                       disabled={orderStatus === 'loading'}
                       className="flex-[2] py-3 px-4 rounded-xl font-bold text-white bg-brand-orange hover:bg-brand-red transition-colors disabled:opacity-70 flex justify-center items-center"
                     >
-                      {orderStatus === 'loading' ? 'Processing...' : `Pay $${cartTotal.toFixed(2)}`}
+                      {orderStatus === 'loading' ? 'Processing...' : `Pay Rs. ${cartTotal}`}
                     </button>
                   </div>
                 ) : (
