@@ -1,7 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,6 +13,11 @@ const io = new Server(server, {
     origin: '*',
     methods: ['GET', 'POST', 'PATCH']
   }
+});
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder_key_id',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_secret'
 });
 
 io.on('connection', (socket) => {
@@ -132,14 +140,57 @@ app.get('/api/menu', (req, res) => {
   res.json(menuItems);
 });
 
+// Razorpay Create Order
+app.post('/api/payments/create-order', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const options = {
+      amount: Math.round(amount * 100), // amount in smallest currency unit
+      currency: "USD",
+      receipt: `rcpt_${Date.now()}`
+    };
+    const order = await razorpay.orders.create(options);
+    res.json(order);
+  } catch (error) {
+    console.error('Error creating Razorpay order:', error);
+    res.status(500).json({ error: 'Failed to create Razorpay order' });
+  }
+});
+
+// Razorpay Verify Signature
+app.post('/api/payments/verify', (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_secret')
+      .update(sign.toString())
+      .digest("hex");
+
+    if (razorpay_signature === expectedSign) {
+      return res.json({ message: "Payment verified successfully", success: true });
+    } else {
+      return res.status(400).json({ error: "Invalid payment signature" });
+    }
+  } catch (error) {
+    console.error('Error verifying payment:', error);
+    res.status(500).json({ error: 'Failed to verify payment' });
+  }
+});
+
 // Submit a new order
 app.post('/api/orders', (req, res) => {
   try {
-    const { customerName, tableOrAddress, phone, items, totalAmount } = req.body;
+    const { customerName, tableOrAddress, phone, items, totalAmount, paymentId } = req.body;
     
     if (!customerName || !tableOrAddress || !phone || !items || items.length === 0) {
       return res.status(400).json({ error: 'Missing required order fields or empty cart.' });
     }
+
+    // Smart ETA Calculation
+    // Base 10 mins + (5 mins * Number of active "Preparing" orders)
+    const preparingOrdersCount = orders.filter(o => o.status === 'Preparing').length;
+    const etaMinutes = 10 + (preparingOrdersCount * 5);
 
     const newOrder = {
       id: `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
@@ -148,6 +199,8 @@ app.post('/api/orders', (req, res) => {
       phone,
       items,
       totalAmount,
+      paymentId: paymentId || null,
+      etaMinutes,
       status: 'Pending',
       createdAt: new Date().toISOString()
     };

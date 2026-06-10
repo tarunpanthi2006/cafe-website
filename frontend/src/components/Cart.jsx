@@ -17,33 +17,107 @@ export default function Cart() {
   const [orderStatus, setOrderStatus] = useState(null); // 'loading', 'success', 'error'
   const navigate = useNavigate();
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleCheckout = async (e) => {
     e.preventDefault();
     setOrderStatus('loading');
     
     try {
-      const response = await fetch('http://localhost:5001/api/orders', {
+      const res = await loadRazorpayScript();
+      if (!res) {
+        throw new Error("Razorpay SDK failed to load. Are you online?");
+      }
+
+      // 1. Create Order on Backend
+      const orderData = await fetch('http://localhost:5001/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          items: cartItems,
-          totalAmount: cartTotal
-        })
+        body: JSON.stringify({ amount: cartTotal })
+      }).then(t => t.json());
+
+      if (!orderData || orderData.error) {
+        throw new Error(orderData.error || 'Failed to initialize payment');
+      }
+
+      // 2. Open Razorpay UI
+      const options = {
+        key: 'rzp_test_placeholder_key_id', // Replace with real key via environment variables later
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'LuxeCafe',
+        description: 'Food Order Payment',
+        order_id: orderData.id,
+        handler: async function (response) {
+          try {
+            // 3. Verify Payment
+            const verifyData = await fetch('http://localhost:5001/api/payments/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response)
+            }).then(t => t.json());
+
+            if (!verifyData.success) {
+              throw new Error("Payment verification failed");
+            }
+
+            // 4. Submit Final Order
+            const finalResponse = await fetch('http://localhost:5001/api/orders', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...formData,
+                items: cartItems,
+                totalAmount: cartTotal,
+                paymentId: response.razorpay_payment_id
+              })
+            });
+            
+            if (!finalResponse.ok) throw new Error('Failed to submit order');
+            
+            localStorage.setItem('customerPhone', formData.phone);
+            
+            setOrderStatus('success');
+            clearCart();
+            setTimeout(() => {
+              setIsCartOpen(false);
+              setOrderStatus(null);
+              setIsCheckingOut(false);
+              navigate('/my-orders');
+            }, 3000);
+
+          } catch (err) {
+            console.error(err);
+            setOrderStatus('error');
+            setTimeout(() => setOrderStatus(null), 3000);
+          }
+        },
+        prefill: {
+          name: formData.customerName,
+          contact: formData.phone
+        },
+        theme: {
+          color: '#FF7F50' // brand-orange
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.on('payment.failed', function (response) {
+        console.error(response.error);
+        setOrderStatus('error');
+        setTimeout(() => setOrderStatus(null), 3000);
       });
       
-      if (!response.ok) throw new Error('Failed to submit order');
-      
-      localStorage.setItem('customerPhone', formData.phone);
-      
-      setOrderStatus('success');
-      clearCart();
-      setTimeout(() => {
-        setIsCartOpen(false);
-        setOrderStatus(null);
-        setIsCheckingOut(false);
-        navigate('/my-orders');
-      }, 3000);
+      paymentObject.open();
+
     } catch (error) {
       console.error(error);
       setOrderStatus('error');

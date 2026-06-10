@@ -111,7 +111,14 @@ export default function MyOrders() {
                     <div className="p-6 md:p-8">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                         <div>
-                          <p className="text-gray-400 text-sm mb-1">Order #{order.id.split('_')[2]}</p>
+                          <div className="flex items-center gap-3 mb-2">
+                            <p className="text-gray-400 text-sm">Order #{order.id.split('_')[2]}</p>
+                            {order.status !== 'Completed' && order.status !== 'Ready' && order.etaMinutes && (
+                              <span className="text-xs font-bold text-brand-orange bg-brand-orange/10 px-2 py-1 rounded-md flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> ETA: {order.etaMinutes} mins
+                              </span>
+                            )}
+                          </div>
                           <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${statusInfo.bg} ${statusInfo.color} font-bold text-sm`}>
                             <StatusIcon className="w-4 h-4" />
                             {statusInfo.text}
