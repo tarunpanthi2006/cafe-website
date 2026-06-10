@@ -11,7 +11,9 @@ export default {
           orange: '#FF7F50',
           red: '#DC143C',
           cream: '#FFFDD0',
-          dark: '#1A1A1A',
+          dark: '#0f172a',
+          surface: '#1e293b',
+          accent: '#FF7F50'
         }
       },
       fontFamily: {

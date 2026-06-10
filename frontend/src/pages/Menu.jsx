@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useCart } from '../context/CartContext';
+import { useCartStore } from '../store/useCartStore';
 import { Plus } from 'lucide-react';
 
 const categories = ['All', 'Pizza', 'Burger', 'Cake', 'Shake'];
@@ -9,7 +9,8 @@ export default function Menu() {
   const [menuItems, setMenuItems] = useState([]);
   const [activeCategory, setActiveCategory] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
-  const { addToCart } = useCart();
+  const addToCart = useCartStore(state => state.addToCart);
+
 
   useEffect(() => {
     fetch('http://localhost:5001/api/menu')
@@ -29,7 +30,7 @@ export default function Menu() {
     : menuItems.filter(item => item.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-brand-cream pb-24">
+    <div className="min-h-screen bg-brand-dark pb-24">
       {/* Menu Header */}
       <div className="bg-brand-dark text-white py-16 px-4">
         <div className="max-w-7xl mx-auto text-center">
@@ -52,7 +53,7 @@ export default function Menu() {
       </div>
 
       {/* Category Tabs */}
-      <div className="sticky top-20 z-40 bg-brand-cream/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+      <div className="sticky top-20 z-40 bg-brand-surface/90 backdrop-blur-md border-b border-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-2 md:space-x-8 overflow-x-auto py-4 scrollbar-hide">
             {categories.map((category) => (
@@ -60,7 +61,7 @@ export default function Menu() {
                 key={category}
                 onClick={() => setActiveCategory(category)}
                 className={`relative px-6 py-2 rounded-full font-bold whitespace-nowrap transition-colors ${
-                  activeCategory === category ? 'text-white' : 'text-gray-500 hover:text-brand-dark hover:bg-gray-100'
+                  activeCategory === category ? 'text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {activeCategory === category && (
@@ -143,7 +144,7 @@ function MenuItemCard({ item, onAdd }) {
           rotateY,
         }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col h-full group"
+        className="bg-brand-surface rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-brand-orange/20 transition-all duration-300 flex flex-col h-full group"
         style={{ transformStyle: "preserve-3d" }}
       >
         <div className="relative h-56 overflow-hidden" style={{ transform: "translateZ(30px)" }}>
@@ -159,14 +160,14 @@ function MenuItemCard({ item, onAdd }) {
         
         <div className="p-6 flex flex-col flex-grow" style={{ transform: "translateZ(20px)" }}>
           <div className="flex justify-between items-start mb-2">
-            <h3 className="text-xl font-bold text-brand-dark leading-tight">{item.name}</h3>
+            <h3 className="text-xl font-bold text-white leading-tight">{item.name}</h3>
             <span className="text-brand-orange font-bold text-xl ml-4">${item.price.toFixed(2)}</span>
           </div>
-          <p className="text-gray-500 text-sm mb-6 flex-grow">{item.description}</p>
+          <p className="text-gray-400 text-sm mb-6 flex-grow">{item.description}</p>
           
           <button 
             onClick={onAdd}
-            className="w-full py-3 rounded-xl font-bold text-brand-dark bg-brand-cream hover:bg-brand-orange hover:text-white transition-all flex items-center justify-center gap-2 group-hover:shadow-md"
+            className="w-full py-3 rounded-xl font-bold text-white bg-white/10 hover:bg-brand-orange hover:text-white transition-all flex items-center justify-center gap-2 group-hover:shadow-md"
             style={{ transform: "translateZ(10px)" }}
           >
             <Plus className="w-5 h-5" /> Add to Cart

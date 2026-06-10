@@ -1,7 +1,23 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH']
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
 const PORT = process.env.PORT || 5001;
 
 app.use(cors());
@@ -137,6 +153,7 @@ app.post('/api/orders', (req, res) => {
     };
 
     orders.push(newOrder);
+    io.emit('newOrder', newOrder); // Broadcast new order to staff dashboard
     res.status(201).json({ message: 'Order created successfully', order: newOrder });
   } catch (error) {
     console.error('Error creating order:', error);
@@ -163,6 +180,7 @@ app.patch('/api/orders/:id', (req, res) => {
   
   if (status) {
     order.status = status;
+    io.emit('orderUpdated', order); // Broadcast update to customers
   }
   
   res.json({ message: 'Order updated successfully', order });
@@ -173,6 +191,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK' });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Backend server running perfectly on port ${PORT}`);
 });

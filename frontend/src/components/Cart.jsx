@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
-import { useCart } from '../context/CartContext';
+import { useCartStore, useCartTotal } from '../store/useCartStore';
 
 export default function Cart() {
-  const { isCartOpen, setIsCartOpen, cartItems, updateQuantity, removeFromCart, cartTotal, clearCart } = useCart();
+  const isCartOpen = useCartStore(state => state.isCartOpen);
+  const setIsCartOpen = useCartStore(state => state.setIsCartOpen);
+  const cartItems = useCartStore(state => state.cartItems);
+  const updateQuantity = useCartStore(state => state.updateQuantity);
+  const removeFromCart = useCartStore(state => state.removeFromCart);
+  const clearCart = useCartStore(state => state.clearCart);
+  const cartTotal = useCartTotal();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [formData, setFormData] = useState({ customerName: '', tableOrAddress: '', phone: '' });
   const [orderStatus, setOrderStatus] = useState(null); // 'loading', 'success', 'error'

@@ -3,3 +3,8 @@ backend/node_modules/
 frontend/node_modules/
 frontend/dist/
 app.log
+
+# GSD Session Files
+.gsd/STATE.md
+.gsd/JOURNAL.md
+.gsd/TODO.md

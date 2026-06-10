@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Coffee, Menu as MenuIcon } from 'lucide-react';
-import { useCart } from '../context/CartContext';
+import { useCartStore, useCartCount } from '../store/useCartStore';
 
 export default function Navbar() {
-  const { cartCount, toggleCart } = useCart();
+  const toggleCart = useCartStore(state => state.toggleCart);
+  const cartCount = useCartCount();
 
   return (
     <nav className="fixed w-full z-50 top-0 transition-all duration-300 glass">
