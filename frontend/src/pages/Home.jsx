@@ -1,129 +1,144 @@
-import React from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Star } from 'lucide-react';
-
-const featuredItems = [
-  {
-    id: 1,
-    name: 'Truffle Mushroom Pizza',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=800',
-    rating: 4.9
-  },
-  {
-    id: 2,
-    name: 'Spicy Inferno Burger',
-    image: 'https://images.unsplash.com/photo-1594212848116-b8dbf932f94d?auto=format&fit=crop&q=80&w=800',
-    rating: 4.8
-  },
-  {
-    id: 3,
-    name: 'Dark Chocolate Truffle',
-    image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&q=80&w=800',
-    rating: 5.0
-  },
-  {
-    id: 4,
-    name: 'Oreo Overload Shake',
-    image: 'https://images.unsplash.com/photo-1572490122747-3968b75bb8ef?auto=format&fit=crop&q=80&w=800',
-    rating: 4.7
-  }
-];
+import { Leaf, Clock, ShieldCheck, Sparkles, ChevronRight, ShoppingBag } from 'lucide-react';
+import { api } from '../lib/api';
+import { useCartStore } from '../store/useCartStore';
 
 export default function Home() {
-  const { scrollY } = useScroll();
-  const y1 = useTransform(scrollY, [0, 1000], [0, 300]);
-  const y2 = useTransform(scrollY, [0, 1000], [0, -100]);
-  const opacity = useTransform(scrollY, [0, 500], [1, 0]);
+  const [popularItems, setPopularItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { addItem } = useCartStore();
+
+  useEffect(() => {
+    api.menu.getPopular()
+      .then(data => {
+        setPopularItems(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section with Parallax */}
-      <section className="relative h-[90vh] flex items-center justify-center overflow-hidden">
-        <motion.div 
-          className="absolute inset-0 z-0"
-          style={{ y: y1, opacity }}
-        >
-          <div className="absolute inset-0 bg-black/40 z-10" />
+    <div className="flex flex-col gap-16 pb-16">
+      {/* Hero Section */}
+      <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=2000" 
-            alt="Cafe ambiance" 
-            className="w-full h-full object-cover"
+            src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1920&q=80" 
+            alt="Cafe Interior" 
+            className="w-full h-full object-cover opacity-30"
           />
-        </motion.div>
-
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            <h1 className="text-5xl md:text-7xl font-serif font-bold text-white mb-6 drop-shadow-xl">
-              Taste the Extraordinary
-            </h1>
-            <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto font-light drop-shadow-md">
-              Experience culinary mastery with our artisanal pizzas, handcrafted burgers, decadent cakes, and indulgent shakes.
-            </p>
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/60 to-transparent" />
+        </div>
+        
+        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto space-y-6">
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white drop-shadow-lg">
+            Experience <span className="text-amber-500">Premium</span> Taste
+          </h1>
+          <p className="text-xl text-gray-300 max-w-2xl mx-auto drop-shadow-md">
+            Savor the finest Nepalese ingredients crafted into global delicacies. Zero wait time, perfectly synced.
+          </p>
+          <div className="pt-8">
             <Link 
               to="/menu"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-brand-orange hover:bg-brand-red text-white rounded-full font-bold text-lg transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(255,127,80,0.4)]"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-amber-500 hover:bg-amber-400 text-gray-900 rounded-full font-bold text-lg transition-all shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_30px_rgba(245,158,11,0.6)] hover:-translate-y-1"
             >
               Order Now <ChevronRight className="w-5 h-5" />
             </Link>
-          </motion.div>
+          </div>
         </div>
       </section>
 
-      {/* Featured Items Horizontal Scroll */}
-      <section className="py-24 bg-white relative z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="flex justify-between items-end mb-12"
-          >
-            <div>
-              <h2 className="text-4xl font-serif font-bold text-brand-dark mb-4">Chef's Signatures</h2>
-              <p className="text-gray-500">Discover our most loved culinary creations.</p>
-            </div>
-            <Link to="/menu" className="hidden md:flex items-center gap-1 text-brand-orange font-bold hover:text-brand-red transition-colors">
-              View Full Menu <ChevronRight className="w-5 h-5" />
-            </Link>
-          </motion.div>
+      {/* Best Sellers Strip */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="flex justify-between items-end mb-8">
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-2">Best Sellers</h2>
+            <p className="text-gray-400">Our most loved creations</p>
+          </div>
+          <Link to="/menu" className="text-amber-500 hover:text-amber-400 font-medium flex items-center gap-1">
+            View All <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
 
-          <div className="flex gap-8 overflow-x-auto pb-8 snap-x scrollbar-hide py-4" style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
-            {featuredItems.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: 50 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="min-w-[300px] md:min-w-[400px] snap-center group cursor-pointer"
-              >
-                <div className="relative h-[300px] rounded-3xl overflow-hidden mb-6 shadow-xl">
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-500 z-10" />
-                  <img 
-                    src={item.image} 
-                    alt={item.name} 
-                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
-                  />
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1 z-20 shadow-lg">
-                    <Star className="w-4 h-4 text-brand-orange fill-brand-orange" />
-                    <span className="font-bold text-sm">{item.rating}</span>
-                  </div>
-                </div>
-                <h3 className="text-2xl font-bold text-brand-dark group-hover:text-brand-orange transition-colors">{item.name}</h3>
-              </motion.div>
+        {loading ? (
+          <div className="flex gap-6 overflow-x-auto pb-8 snap-x">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="min-w-[280px] h-[350px] bg-gray-900 rounded-2xl animate-pulse flex-shrink-0 border border-gray-800" />
             ))}
           </div>
-          
-          <div className="mt-8 text-center md:hidden">
-             <Link to="/menu" className="inline-flex items-center gap-1 text-brand-orange font-bold hover:text-brand-red transition-colors">
-              View Full Menu <ChevronRight className="w-5 h-5" />
-            </Link>
+        ) : (
+          <div className="flex gap-6 overflow-x-auto pb-8 snap-x hide-scrollbar">
+            {popularItems.map((item) => (
+              <div key={item.id} className="min-w-[280px] bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 flex-shrink-0 snap-start group relative transition-transform hover:-translate-y-2">
+                <div className="h-48 overflow-hidden relative">
+                  <img 
+                    src={item.image_url} 
+                    alt={item.name} 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute top-3 left-3 flex gap-2">
+                    {item.is_veg && <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded backdrop-blur-md border border-green-500/30">VEG</span>}
+                  </div>
+                  {item.avg_rating > 0 && (
+                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-bold text-amber-500 flex items-center gap-1 border border-white/10">
+                      ★ {item.avg_rating}
+                    </div>
+                  )}
+                </div>
+                <div className="p-5 flex flex-col justify-between h-[180px]">
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1 truncate">{item.name}</h3>
+                    <p className="text-amber-500 font-bold text-lg">रू {item.price}</p>
+                  </div>
+                  <button 
+                    onClick={() => addItem(item)}
+                    className="w-full py-3 bg-gray-800 hover:bg-amber-500 text-white hover:text-gray-900 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 mt-4"
+                  >
+                    <ShoppingBag className="w-5 h-5" /> Add to Cart
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Trust Badges */}
+      <section className="bg-gray-900 border-y border-gray-800 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500">
+                <Leaf className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-white">Fresh Ingredients</h3>
+              <p className="text-sm text-gray-400">Locally sourced daily</p>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                <Clock className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-white">30-min Delivery</h3>
+              <p className="text-sm text-gray-400">Hot and fresh to you</p>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-white">FSSAI Certified</h3>
+              <p className="text-sm text-gray-400">Guaranteed quality</p>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500">
+                <Sparkles className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-white">100% Hygienic</h3>
+              <p className="text-sm text-gray-400">Safe prep environment</p>
+            </div>
           </div>
         </div>
       </section>

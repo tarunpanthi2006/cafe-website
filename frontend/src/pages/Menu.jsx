@@ -1,179 +1,185 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, ShoppingBag, Plus, Minus } from 'lucide-react';
+import { api } from '../lib/api';
 import { useCartStore } from '../store/useCartStore';
-import { Plus } from 'lucide-react';
-
-const categories = ['All', 'Pizza', 'Burger', 'Cake', 'Shake'];
 
 export default function Menu() {
-  const [menuItems, setMenuItems] = useState([]);
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(true);
-  const addToCart = useCartStore(state => state.addToCart);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('All');
+  const [filters, setFilters] = useState({ veg: false, vegan: false, glutenFree: false });
+  
+  const { addItem, items: cartItems, updateQuantity } = useCartStore();
 
+  const categories = ['All', 'Pizza', 'Burgers', 'Cakes', 'Shakes'];
 
-  useEffect(() => {
-    fetch('http://localhost:5001/api/menu')
-      .then(res => res.json())
-      .then(data => {
-        setMenuItems(data);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error("Failed to fetch menu:", err);
-        setIsLoading(false);
+  const fetchMenu = useCallback(async (currentSearch) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.menu.getAll({ 
+        category, 
+        veg: filters.veg || filters.vegan, // Simplification for backend matching
+        search: currentSearch 
       });
-  }, []);
+      // Client-side filtering for the other pills since backend only has 'veg' in query param design
+      let filtered = data;
+      if (filters.vegan) filtered = filtered.filter(i => i.is_vegan);
+      if (filters.glutenFree) filtered = filtered.filter(i => i.is_gluten_free);
+      
+      setItems(filtered);
+    } catch (err) {
+      setError(err.message || "Failed to load menu");
+    } finally {
+      setLoading(false);
+    }
+  }, [category, filters]);
 
-  const filteredItems = activeCategory === 'All' 
-    ? menuItems 
-    : menuItems.filter(item => item.category === activeCategory);
-
-  return (
-    <div className="min-h-screen bg-brand-dark pb-24">
-      {/* Menu Header */}
-      <div className="bg-brand-dark text-white py-16 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <motion.h1 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="text-4xl md:text-6xl font-serif font-bold mb-6"
-          >
-            Our Menu
-          </motion.h1>
-          <motion.p 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-gray-400 max-w-2xl mx-auto"
-          >
-            Crafted with passion, served with love. Choose from our selection of premium delicacies.
-          </motion.p>
-        </div>
-      </div>
-
-      {/* Category Tabs */}
-      <div className="sticky top-20 z-40 bg-brand-surface/90 backdrop-blur-md border-b border-gray-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-2 md:space-x-8 overflow-x-auto py-4 scrollbar-hide">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setActiveCategory(category)}
-                className={`relative px-6 py-2 rounded-full font-bold whitespace-nowrap transition-colors ${
-                  activeCategory === category ? 'text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {activeCategory === category && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 bg-brand-orange rounded-full z-0 shadow-md shadow-brand-orange/30"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10">{category}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Menu Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="w-16 h-16 border-4 border-brand-orange border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : (
-          <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            <AnimatePresence>
-              {filteredItems.map((item) => (
-                <MenuItemCard key={item.id} item={item} onAdd={() => addToCart(item)} />
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// 3D Magnetic Tilt Card Component
-function MenuItemCard({ item, onAdd }) {
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-
-  const handleMouseMove = (e) => {
-    const card = e.currentTarget;
-    const box = card.getBoundingClientRect();
-    const x = e.clientX - box.left;
-    const y = e.clientY - box.top;
-    const centerX = box.width / 2;
-    const centerY = box.height / 2;
-    
-    // Calculate rotation limits (max 10 degrees)
-    const rotateXValue = ((y - centerY) / centerY) * -10;
-    const rotateYValue = ((x - centerX) / centerX) * 10;
-
-    setRotateX(rotateXValue);
-    setRotateY(rotateYValue);
-  };
-
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-  };
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchMenu(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, fetchMenu]);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.3 }}
-      style={{
-        perspective: 1000,
-      }}
-      className="h-full"
-    >
-      <motion.div
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        animate={{
-          rotateX,
-          rotateY,
-        }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="bg-brand-surface rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-brand-orange/20 transition-all duration-300 flex flex-col h-full group"
-        style={{ transformStyle: "preserve-3d" }}
-      >
-        <div className="relative h-56 overflow-hidden" style={{ transform: "translateZ(30px)" }}>
-          <img 
-            src={item.image} 
-            alt={item.name} 
-            className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
-          />
-          <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-gray-600 shadow-sm">
-            {item.category}
-          </div>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8 space-y-6">
+        <h1 className="text-4xl font-bold text-white tracking-tight">Our Menu</h1>
         
-        <div className="p-6 flex flex-col flex-grow" style={{ transform: "translateZ(20px)" }}>
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="text-xl font-bold text-white leading-tight">{item.name}</h3>
-            <span className="text-brand-orange font-bold text-xl ml-4">Rs. {item.price}</span>
+        {/* Search and Filters row */}
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input 
+              type="text" 
+              placeholder="Search dishes..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-shadow placeholder:text-gray-500"
+            />
           </div>
-          <p className="text-gray-400 text-sm mb-6 flex-grow">{item.description}</p>
           
-          <button 
-            onClick={onAdd}
-            className="w-full py-3 rounded-xl font-bold text-white bg-white/10 hover:bg-brand-orange hover:text-white transition-all flex items-center justify-center gap-2 group-hover:shadow-md"
-            style={{ transform: "translateZ(10px)" }}
-          >
-            <Plus className="w-5 h-5" /> Add to Cart
+          <div className="flex flex-wrap gap-2">
+            <button 
+              onClick={() => setFilters(f => ({ ...f, veg: !f.veg }))}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${filters.veg ? 'bg-green-500/20 text-green-400 border-green-500/50' : 'bg-gray-900 text-gray-400 border-gray-800 hover:border-gray-600'}`}
+            >
+              Veg
+            </button>
+            <button 
+              onClick={() => setFilters(f => ({ ...f, vegan: !f.vegan }))}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${filters.vegan ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-gray-900 text-gray-400 border-gray-800 hover:border-gray-600'}`}
+            >
+              Vegan
+            </button>
+            <button 
+              onClick={() => setFilters(f => ({ ...f, glutenFree: !f.glutenFree }))}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${filters.glutenFree ? 'bg-amber-500/20 text-amber-400 border-amber-500/50' : 'bg-gray-900 text-gray-400 border-gray-800 hover:border-gray-600'}`}
+            >
+              Gluten-Free
+            </button>
+          </div>
+        </div>
+
+        {/* Categories */}
+        <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-colors ${category === cat ? 'bg-white text-gray-950' : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? (
+        <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-6 text-center space-y-4">
+          <p className="text-red-400">{error}</p>
+          <button onClick={() => fetchMenu(search)} className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors">
+            Try Again
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      ) : loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div key={i} className="h-[380px] bg-gray-900 rounded-2xl animate-pulse border border-gray-800" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-20 bg-gray-900 rounded-3xl border border-gray-800 border-dashed">
+          <p className="text-gray-400 text-lg">No matching items found.</p>
+          <button onClick={() => { setSearch(''); setFilters({veg:false, vegan:false, glutenFree:false}); setCategory('All'); }} className="mt-4 text-amber-500 hover:text-amber-400 font-medium">
+            Clear all filters
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {items.map(item => (
+            <div key={item.id} className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 flex flex-col group relative transition-transform hover:-translate-y-1 hover:border-gray-700 hover:shadow-2xl hover:shadow-black/50">
+              <div className="h-48 overflow-hidden relative">
+                <img 
+                  src={item.image_url} 
+                  alt={item.name} 
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute top-3 left-3 flex flex-wrap gap-2 max-w-[80%]">
+                  {item.is_veg && <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded backdrop-blur-md border border-green-500/30 shadow-lg">VEG</span>}
+                  {item.is_vegan && <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded backdrop-blur-md border border-emerald-500/30 shadow-lg">VEGAN</span>}
+                  {item.is_gluten_free && <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs font-bold rounded backdrop-blur-md border border-amber-500/30 shadow-lg">GF</span>}
+                </div>
+                {item.avg_rating > 0 && (
+                  <div className="absolute top-3 right-3 bg-black/80 backdrop-blur-md px-2 py-1 rounded text-xs font-bold text-amber-500 flex items-center gap-1 border border-white/10 shadow-lg">
+                    ★ {item.avg_rating}
+                  </div>
+                )}
+              </div>
+              <div className="p-5 flex flex-col flex-1">
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-2 leading-tight">{item.name}</h3>
+                  <p className="text-gray-400 text-sm line-clamp-2">{item.description}</p>
+                </div>
+                <div className="mt-6 flex items-center justify-between">
+                  <span className="text-amber-500 font-bold text-xl tracking-tight">रू {item.price}</span>
+                  {cartItems.find(i => i.id === item.id) ? (
+                    <div className="flex items-center gap-2 bg-gray-800 p-1.5 rounded-xl border border-gray-700">
+                      <button 
+                        onClick={() => updateQuantity(item.id, cartItems.find(i => i.id === item.id).quantity - 1)}
+                        className="p-2 rounded-lg hover:bg-gray-700 text-white transition-colors"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="font-bold text-white min-w-[1.2rem] text-center">
+                        {cartItems.find(i => i.id === item.id).quantity}
+                      </span>
+                      <button 
+                        onClick={() => updateQuantity(item.id, cartItems.find(i => i.id === item.id).quantity + 1)}
+                        className="p-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-900 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => addItem(item)}
+                      className="p-3 bg-gray-800 hover:bg-amber-500 text-white hover:text-gray-900 rounded-xl transition-colors shadow-lg active:scale-95"
+                    >
+                      <ShoppingBag className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

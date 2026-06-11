@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, RefreshCw, Phone, MapPin, User, Clock, CheckCircle, Package } from 'lucide-react';
+import { LayoutDashboard, RefreshCw, Phone, MapPin, User, Clock, CheckCircle, Package, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { socket } from '../services/socket';
 
 export default function Admin() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    navigate('/admin/login');
+  };
 
   const fetchOrders = async () => {
     setIsRefreshing(true);
@@ -85,6 +92,13 @@ export default function Admin() {
             >
               <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
+            <button 
+              onClick={handleLogout}
+              className="p-3 bg-brand-red/20 hover:bg-brand-red/30 text-brand-red rounded-lg transition-colors flex items-center justify-center border border-brand-red/20"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
@@ -104,7 +118,7 @@ export default function Admin() {
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <AnimatePresence>
-            {orders.map((order, index) => (
+            {orders.filter(order => order.status !== 'Completed').map((order, index) => (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}

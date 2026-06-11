@@ -1,163 +1,103 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, CheckCircle, Package, ExternalLink } from 'lucide-react';
-import { socket } from '../services/socket';
+import React, { useEffect, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { formatInTimeZone } from 'date-fns-tz';
+import { Clock, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function MyOrders() {
+  const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const phone = localStorage.getItem('customerPhone');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!phone) {
-      setIsLoading(false);
-      return;
+    if (user) {
+      api.orders.getUserOrders(user.id)
+        .then(data => {
+          setOrders(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setLoading(false);
+        });
     }
+  }, [user]);
 
-    const fetchMyOrders = async () => {
-      try {
-        const res = await fetch(`http://localhost:5001/api/orders/customer/${phone}`);
-        const data = await res.json();
-        setOrders(data);
-      } catch (err) {
-        console.error("Failed to fetch my orders:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  if (authLoading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-amber-500" /></div>;
+  if (!user) return <Navigate to="/" replace />;
 
-    fetchMyOrders();
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'placed': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'preparing': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'out_for_delivery': 
+      case 'ready': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      case 'delivered': 
+      case 'served': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      default: return 'bg-gray-800 text-gray-400 border-gray-700';
+    }
+  };
 
-    // Listen to real-time updates for my orders
-    const handleOrderUpdated = (updatedOrder) => {
-      if (updatedOrder.phone === phone) {
-        setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-      }
-    };
-
-    socket.on('orderUpdated', handleOrderUpdated);
-
-    return () => {
-      socket.off('orderUpdated', handleOrderUpdated);
-    };
-  }, [phone]);
-
-  if (!phone) {
-    return (
-      <div className="min-h-screen bg-brand-dark pt-24 pb-12 flex flex-col items-center justify-center px-4">
-        <Package className="w-20 h-20 text-gray-600 mb-6" />
-        <h1 className="text-3xl font-serif font-bold text-white mb-2">No Active Orders</h1>
-        <p className="text-gray-400 text-center max-w-md">
-          You haven't placed any orders yet, or your order history has been cleared from this device.
-        </p>
-      </div>
-    );
-  }
-
-  const getStatusDisplay = (status) => {
-    switch (status) {
-      case 'Pending':
-        return { color: 'text-yellow-400', bg: 'bg-yellow-400/10', icon: Clock, text: 'Order Received' };
-      case 'Preparing':
-        return { color: 'text-blue-400', bg: 'bg-blue-400/10', icon: CheckCircle, text: 'Preparing Your Food' };
-      case 'Ready':
-        return { color: 'text-brand-orange', bg: 'bg-brand-orange/10', icon: Package, text: 'Ready for Pickup / Serving' };
-      case 'Completed':
-        return { color: 'text-green-400', bg: 'bg-green-400/10', icon: CheckCircle, text: 'Completed' };
-      default:
-        return { color: 'text-gray-400', bg: 'bg-gray-400/10', icon: Clock, text: status };
+  const formatDate = (isoString) => {
+    try {
+      return formatInTimeZone(new Date(isoString), 'Asia/Kathmandu', 'MMM d, yyyy • h:mm a');
+    } catch {
+      return 'Invalid Date';
     }
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <motion.h1 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="text-4xl md:text-5xl font-serif font-bold text-white mb-4"
-          >
-            My Orders
-          </motion.h1>
-          <p className="text-gray-400">Tracking orders for <span className="font-bold text-white">{phone}</span></p>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <h1 className="text-3xl font-bold text-white mb-8 tracking-tight">My Orders</h1>
+
+      {loading ? (
+        <div className="space-y-4">
+          {[1,2,3].map(i => <div key={i} className="h-32 bg-gray-900 rounded-2xl animate-pulse border border-gray-800" />)}
         </div>
-
-        {isLoading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : orders.length === 0 ? (
-           <div className="bg-brand-surface rounded-3xl p-12 text-center border border-white/5 flex flex-col items-center justify-center">
-             <Package className="w-16 h-16 text-gray-600 mb-4" />
-             <h2 className="text-2xl font-bold text-white mb-2">No Recent Orders</h2>
-             <p className="text-gray-400">Your recent orders will appear here.</p>
-           </div>
-        ) : (
-          <div className="space-y-6">
-            <AnimatePresence>
-              {orders.map((order, index) => {
-                const statusInfo = getStatusDisplay(order.status);
-                const StatusIcon = statusInfo.icon;
+      ) : orders.length === 0 ? (
+        <div className="text-center py-20 bg-gray-900 rounded-3xl border border-gray-800 border-dashed">
+          <ShoppingBag className="w-16 h-16 text-gray-700 mx-auto mb-4" />
+          <p className="text-gray-400 text-lg mb-6">You haven't placed any orders yet.</p>
+          <Link to="/menu" className="inline-flex px-6 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-xl transition-colors">
+            Browse Menu
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {orders.map(order => (
+            <div key={order.id} className="bg-gray-900 rounded-2xl p-6 border border-gray-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-gray-700 transition-colors">
+              <div className="space-y-3 flex-1">
+                <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1 text-xs font-bold rounded-full border uppercase tracking-wider ${getStatusColor(order.status)}`}>
+                    {order.status.replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-gray-500 text-sm font-mono">#{order.id.split('-')[0]}</span>
+                </div>
                 
-                return (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    key={order.id}
-                    className="bg-brand-surface rounded-3xl border border-white/5 overflow-hidden shadow-xl"
-                  >
-                    <div className="p-6 md:p-8">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                        <div>
-                          <div className="flex items-center gap-3 mb-2">
-                            <p className="text-gray-400 text-sm">Order #{order.id.split('_')[2]}</p>
-                            {order.status !== 'Completed' && order.status !== 'Ready' && order.etaMinutes && (
-                              <span className="text-xs font-bold text-brand-orange bg-brand-orange/10 px-2 py-1 rounded-md flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> ETA: {order.etaMinutes} mins
-                              </span>
-                            )}
-                          </div>
-                          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${statusInfo.bg} ${statusInfo.color} font-bold text-sm`}>
-                            <StatusIcon className="w-4 h-4" />
-                            {statusInfo.text}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-gray-400 text-sm mb-1">Total Amount</p>
-                          <p className="text-2xl font-bold text-brand-orange">Rs. {order.totalAmount}</p>
-                        </div>
-                      </div>
+                <p className="text-gray-300 text-sm">
+                  {order.items.length} items • <span className="font-medium text-white">{order.order_type.replace('_', ' ').toUpperCase()}</span>
+                </p>
+                
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <Clock className="w-4 h-4" />
+                  {formatDate(order.created_at)}
+                </div>
+              </div>
 
-                      <div className="border-t border-white/5 pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {order.items.map((item, i) => (
-                            <div key={i} className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-brand-dark flex-shrink-0">
-                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-white">{item.name}</h4>
-                                <p className="text-gray-400 text-sm">Qty: {item.quantity} × Rs. {item.price}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="mt-6 flex items-center justify-between text-sm text-gray-500">
-                        <span>Placed at {new Date(order.createdAt).toLocaleTimeString('en-US', { timeZone: 'Asia/Kathmandu' })}</span>
-                        <span>{order.tableOrAddress}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        )}
-      </div>
+              <div className="flex flex-col md:items-end gap-3 w-full md:w-auto border-t border-gray-800 pt-4 md:border-0 md:pt-0">
+                <span className="text-2xl font-bold text-amber-500 tracking-tight">रू {order.total_amount}</span>
+                <Link 
+                  to={`/order-tracking/${order.id}`}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors w-full md:w-auto"
+                >
+                  Track Order <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

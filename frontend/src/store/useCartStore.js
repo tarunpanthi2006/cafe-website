@@ -1,50 +1,59 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-export const useCartStore = create((set, get) => ({
-  cartItems: [],
-  isCartOpen: false,
-
-  addToCart: (item) => {
-    set((state) => {
-      const existing = state.cartItems.find(i => i.id === item.id);
-      if (existing) {
-        return {
-          cartItems: state.cartItems.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i),
-          isCartOpen: true
-        };
+export const useCartStore = create(
+  persist(
+    (set, get) => ({
+      items: [],
+      orderType: 'dine_in',
+      
+      setOrderType: (type) => set({ orderType: type }),
+      
+      addItem: (item) => {
+        set((state) => {
+          const existing = state.items.find((i) => i.id === item.id);
+          if (existing) {
+            return {
+              items: state.items.map((i) =>
+                i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+              ),
+            };
+          }
+          return { items: [...state.items, { ...item, quantity: 1 }] };
+        });
+      },
+      
+      removeItem: (id) => {
+        set((state) => ({
+          items: state.items.filter((i) => i.id !== id),
+        }));
+      },
+      
+      updateQuantity: (id, quantity) => {
+        set((state) => {
+          if (quantity <= 0) {
+            return { items: state.items.filter((i) => i.id !== id) };
+          }
+          return {
+            items: state.items.map((i) =>
+              i.id === id ? { ...i, quantity } : i
+            ),
+          };
+        });
+      },
+      
+      clearCart: () => set({ items: [] }),
+      
+      getSubtotal: () => {
+        return get().items.reduce((total, item) => total + item.price * item.quantity, 0);
+      },
+      
+      getTotalItems: () => {
+        return get().items.reduce((total, item) => total + item.quantity, 0);
       }
-      return {
-        cartItems: [...state.cartItems, { ...item, quantity: 1 }],
-        isCartOpen: true
-      };
-    });
-  },
-
-  removeFromCart: (id) => set((state) => ({
-    cartItems: state.cartItems.filter(i => i.id !== id)
-  })),
-
-  updateQuantity: (id, quantity) => {
-    if (quantity <= 0) {
-      get().removeFromCart(id);
-      return;
+    }),
+    {
+      name: 'luxecafe-cart',
     }
-    set((state) => ({
-      cartItems: state.cartItems.map(i => i.id === id ? { ...i, quantity } : i)
-    }));
-  },
-
-  clearCart: () => set({ cartItems: [] }),
-  
-  toggleCart: () => set((state) => ({ isCartOpen: !state.isCartOpen })),
-  
-  setIsCartOpen: (isOpen) => set({ isCartOpen: isOpen }),
-}));
-
-export const useCartTotal = () => useCartStore((state) => 
-  state.cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
-);
-
-export const useCartCount = () => useCartStore((state) => 
-  state.cartItems.reduce((count, item) => count + item.quantity, 0)
+  )
 );

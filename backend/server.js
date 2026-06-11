@@ -4,6 +4,11 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
+
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const JWT_SECRET = process.env.JWT_SECRET || 'luxe_cafe_super_secret_key_123';
 
 const app = express();
 const server = http.createServer(app);
@@ -136,14 +141,35 @@ app.get('/api/menu', (req, res) => {
   res.json(menuItems);
 });
 
+// Admin Login Route
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ success: false, message: 'Invalid credentials' });
+  }
+});
+
 // Khalti Initiate Order
 app.post('/api/payments/khalti/initiate', async (req, res) => {
   try {
     const { amount, purchase_order_id, purchase_order_name, customer_info } = req.body;
     
+    if (KHALTI_SECRET_KEY === 'test_secret_key_placeholder') {
+      const mockPidx = `mock_pidx_${Date.now()}`;
+      return res.json({
+        pidx: mockPidx,
+        payment_url: `http://localhost:5180/?pidx=${mockPidx}`,
+        expires_at: new Date(Date.now() + 3600000).toISOString(),
+        expires_in: 3600
+      });
+    }
+
     const payload = {
-      return_url: "http://localhost:5173/", // URL to redirect back to
-      website_url: "http://localhost:5173",
+      return_url: "http://localhost:5180/", // URL to redirect back to
+      website_url: "http://localhost:5180",
       amount: Math.round(amount * 100), // Khalti expects amount in paisa
       purchase_order_id: purchase_order_id || `ord_${Date.now()}`,
       purchase_order_name: purchase_order_name || "LuxeCafe Order",
@@ -173,6 +199,10 @@ app.post('/api/payments/khalti/verify', async (req, res) => {
   try {
     const { pidx } = req.body;
     
+    if (pidx.startsWith('mock_pidx_')) {
+      return res.json({ message: "Payment verified successfully", success: true, data: { status: 'Completed', pidx } });
+    }
+
     const response = await axios.post('https://a.khalti.com/api/v2/epayment/lookup/', { pidx }, {
       headers: {
         'Authorization': `Key ${KHALTI_SECRET_KEY}`,
