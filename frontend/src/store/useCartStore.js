@@ -6,6 +6,7 @@ export const useCartStore = create(
     (set, get) => ({
       items: [],
       orderType: 'dine_in',
+      appliedPromo: null,
       
       setOrderType: (type) => set({ orderType: type }),
       
@@ -42,7 +43,11 @@ export const useCartStore = create(
         });
       },
       
-      clearCart: () => set({ items: [] }),
+      clearCart: () => set({ items: [], appliedPromo: null }),
+      
+      replaceCart: (newItems) => set({ items: [...newItems] }),
+      
+      addMultipleItems: (newItems) => set({ items: [...newItems] }),
       
       getSubtotal: () => {
         return get().items.reduce((total, item) => total + item.price * item.quantity, 0);
@@ -50,7 +55,11 @@ export const useCartStore = create(
       
       getTotalItems: () => {
         return get().items.reduce((total, item) => total + item.quantity, 0);
-      }
+      },
+      
+      setAppliedPromo: (promo) => set({ appliedPromo: promo }),
+      
+      removeAppliedPromo: () => set({ appliedPromo: null })
     }),
     {
       name: 'luxecafe-cart',

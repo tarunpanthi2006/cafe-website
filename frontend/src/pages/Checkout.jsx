@@ -3,41 +3,78 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Wallet, Truck, PersonStanding, UtensilsCrossed, MapPin } from 'lucide-react';
+import LocationModal from '../components/LocationModal';
+import { useToast } from '../context/ToastContext';
+import SmartRecommendations from '../components/SmartRecommendations';
 
 export default function Checkout() {
-  const { items, orderType, setOrderType, getSubtotal, clearCart } = useCartStore();
+  const { items, orderType, setOrderType, getSubtotal, clearCart, appliedPromo, setAppliedPromo, removeAppliedPromo } = useCartStore();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [address, setAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('');
   
-  const [promoCode, setPromoCode] = useState('');
-  const [promoResult, setPromoResult] = useState(null);
+  const [promoCode, setPromoCode] = useState(appliedPromo?.code || '');
+  const [promoError, setPromoError] = useState(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [error, setError] = useState(null);
+  
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const { addToast } = useToast();
+  
+  const savedLocation = localStorage.getItem('luxecafe_location') || address;
 
   if (items.length === 0) {
     return <Navigate to="/menu" replace />;
   }
 
   const subtotal = getSubtotal();
-  const discount = promoResult?.valid ? promoResult.discount_amount : 0;
+  const discount = appliedPromo ? Math.round(subtotal * (appliedPromo.discount_percent / 100)) : 0;
   const total = subtotal - discount;
 
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
     setIsApplyingPromo(true);
+    setPromoError(null);
     try {
       const res = await api.promo.validate(promoCode, subtotal);
-      setPromoResult(res);
+      if (res.valid) {
+        setAppliedPromo({ code: promoCode.toUpperCase(), discount_percent: res.discount_percent });
+        setPromoError(null);
+      } else {
+        setPromoError(res.message || 'Invalid promo code');
+      }
     } catch (err) {
-      setPromoResult({ valid: false, message: 'Failed to validate promo' });
+      setPromoError('Failed to validate promo');
     } finally {
       setIsApplyingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    removeAppliedPromo();
+    setPromoCode('');
+    setPromoError(null);
+  };
+
+  const saveOrderToHistory = (orderData, cartItems, finalTotal) => {
+    try {
+      const history = JSON.parse(localStorage.getItem('luxecafe_order_history') || '[]');
+      history.unshift({
+        id: orderData.order_id || orderData.id,
+        items: cartItems.map(item => ({ id: item.id, name: item.name, category: item.category })),
+        total: finalTotal,
+        timestamp: new Date().toISOString(),
+        date: new Date().toLocaleDateString()
+      });
+      const trimmed = history.slice(0, 3);
+      localStorage.setItem('luxecafe_order_history', JSON.stringify(trimmed));
+    } catch (error) {
+      console.error('Failed to save order history:', error);
     }
   };
 
@@ -52,23 +89,30 @@ export default function Checkout() {
     setError(null);
 
     try {
-      // Simulate Khalti Payment Delay
+      // Khalti Simulation
       await new Promise(r => setTimeout(r, 1500));
+      
+      // Khalti Success Toast
+      addToast('✅ Payment successful via Khalti (Test Mode)', 'success');
 
       const payload = {
         user_id: user.id,
         items: items.map(i => ({ menu_item_id: i.id, quantity: i.quantity, unit_price: i.price })),
         order_type: orderType,
         total_amount: total,
-        address: orderType === 'delivery' ? address : null,
+        address: orderType === 'delivery' ? (savedLocation || address) : null,
         table_number: orderType === 'dine_in' ? tableNumber : null,
-        promo_code: promoResult?.valid ? promoCode : null
+        promo_code: appliedPromo ? appliedPromo.code : null
       };
 
       const res = await api.orders.create(payload);
+      
+      saveOrderToHistory(res, items, total);
+      
       clearCart();
       navigate(`/order-tracking/${res.order_id}`, { replace: true });
     } catch (err) {
+      addToast('❌ Payment failed. Please try again.', 'error');
       setError(err.message || 'Failed to place order');
       setIsPlacingOrder(false);
     }
@@ -113,15 +157,52 @@ export default function Checkout() {
             {orderType === 'delivery' && (
               <div className="mt-6">
                 <label className="block text-sm font-medium text-gray-400 mb-2">Delivery Address</label>
-                <textarea 
-                  value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  placeholder="Enter your full address"
-                  rows={3}
-                  className="w-full bg-gray-950 border border-gray-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 resize-none"
-                />
+                <div className="flex gap-4">
+                  <textarea 
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    placeholder={savedLocation || "Enter your full address"}
+                    rows={2}
+                    className="flex-1 bg-gray-950 border border-gray-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 resize-none"
+                  />
+                </div>
               </div>
             )}
+            
+            {/* Delivery Estimate */}
+            <div className="mt-6 p-4 bg-gray-950 rounded-xl border border-gray-800 flex items-start gap-4">
+              {orderType === 'delivery' && (
+                <>
+                  <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><Truck className="w-6 h-6" /></div>
+                  <div className="flex-1">
+                    <p className="font-bold text-white mb-1">Estimated delivery: 25-35 minutes</p>
+                    {savedLocation ? (
+                      <p className="text-sm text-gray-400 flex items-center gap-1"><MapPin className="w-3 h-3"/> Delivering to {savedLocation}</p>
+                    ) : (
+                      <button onClick={() => setIsLocationModalOpen(true)} className="text-sm text-amber-500 hover:text-amber-400 flex items-center gap-1 font-medium"><MapPin className="w-3 h-3"/> Set delivery location</button>
+                    )}
+                  </div>
+                </>
+              )}
+              {orderType === 'takeaway' && (
+                <>
+                  <div className="p-2 bg-orange-500/10 rounded-lg text-orange-500"><PersonStanding className="w-6 h-6" /></div>
+                  <div className="flex-1">
+                    <p className="font-bold text-white mb-1">Ready for pickup in 10-15 minutes</p>
+                    <p className="text-sm text-gray-400">Please arrive at counter</p>
+                  </div>
+                </>
+              )}
+              {orderType === 'dine_in' && (
+                <>
+                  <div className="p-2 bg-green-500/10 rounded-lg text-green-500"><UtensilsCrossed className="w-6 h-6" /></div>
+                  <div className="flex-1">
+                    <p className="font-bold text-white mb-1">Served at your table in 15-20 minutes</p>
+                    <p className="text-sm text-gray-400">We'll bring it to you</p>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Promo Code */}
@@ -143,11 +224,34 @@ export default function Checkout() {
                 {isApplyingPromo ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Apply'}
               </button>
             </div>
-            {promoResult && (
-              <div className={`mt-3 flex items-center gap-2 text-sm ${promoResult.valid ? 'text-green-400' : 'text-red-400'}`}>
-                {promoResult.valid ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                {promoResult.message}
+            {appliedPromo ? (
+              <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-xl relative">
+                <p className="text-green-400 font-bold mb-1 flex items-center gap-2">
+                  🎉 You saved रू{discount} with {appliedPromo.code}!
+                </p>
+                <p className="text-sm text-green-500/80">Original: रू{subtotal} → After discount: रू{total}</p>
+                <button 
+                  onClick={handleRemovePromo}
+                  className="absolute top-4 right-4 text-green-500/60 hover:text-green-400 text-sm underline underline-offset-2"
+                >
+                  Remove
+                </button>
               </div>
+            ) : (
+              <>
+                {promoError && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-red-400">
+                    <AlertCircle className="w-4 h-4" />
+                    {promoError}
+                  </div>
+                )}
+                <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <p className="text-amber-500/90 text-sm flex items-start gap-2">
+                    <span className="text-base">💡</span>
+                    Add a promo code (LUXE20) to save 20% on your first order!
+                  </p>
+                </div>
+              </>
             )}
           </div>
 
@@ -175,9 +279,9 @@ export default function Checkout() {
                 <span>Subtotal</span>
                 <span>रू {subtotal}</span>
               </div>
-              {discount > 0 && (
+              {appliedPromo && (
                 <div className="flex justify-between text-green-400 text-sm font-bold">
-                  <span>Discount ({promoResult.discount_percent}%)</span>
+                  <span>Discount ({appliedPromo.discount_percent}%)</span>
                   <span>- रू {discount}</span>
                 </div>
               )}
@@ -193,11 +297,13 @@ export default function Checkout() {
                 <span>{error}</span>
               </div>
             )}
+            
+            <SmartRecommendations />
 
             <button
               onClick={handlePlaceOrder}
-              disabled={isPlacingOrder || (orderType === 'delivery' && !address) || (orderType === 'dine_in' && !tableNumber)}
-              className="w-full py-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:hover:bg-amber-500 text-gray-950 font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)] flex justify-center items-center gap-2"
+              disabled={isPlacingOrder || (orderType === 'delivery' && !address && !savedLocation) || (orderType === 'dine_in' && !tableNumber)}
+              className="w-full py-4 bg-[#5E32E1] hover:bg-[#4A26B5] disabled:opacity-50 disabled:hover:bg-[#5E32E1] text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(94,50,225,0.3)] flex justify-center items-center gap-2"
             >
               {isPlacingOrder ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processing Khalti...</>
@@ -205,12 +311,23 @@ export default function Checkout() {
                 'Pay with Khalti'
               )}
             </button>
-            <p className="text-xs text-center text-gray-500 mt-4">
-              By placing this order, you agree to our Terms of Service. Mock Khalti payment will be automatically successful.
-            </p>
+            
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mt-4">
+              <Wallet className="w-4 h-4" />
+              <span>Khalti Test Mode — No real payment</span>
+            </div>
+            
           </div>
         </div>
       </div>
+      <LocationModal 
+        isOpen={isLocationModalOpen} 
+        onClose={() => setIsLocationModalOpen(false)} 
+        location={address}
+        setLocation={(loc) => {
+          setAddress(loc);
+        }}
+      />
     </div>
   );
 }

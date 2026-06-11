@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Clock, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
+import OrderAgainButton from '../components/OrderAgainButton';
 
 export default function MyOrders() {
   const { user, loading: authLoading } = useAuth();
@@ -87,12 +88,15 @@ export default function MyOrders() {
 
               <div className="flex flex-col md:items-end gap-3 w-full md:w-auto border-t border-gray-800 pt-4 md:border-0 md:pt-0">
                 <span className="text-2xl font-bold text-amber-500 tracking-tight">रू {order.total_amount}</span>
-                <Link 
-                  to={`/order-tracking/${order.id}`}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors w-full md:w-auto"
-                >
-                  Track Order <ArrowRight className="w-4 h-4" />
-                </Link>
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                  <OrderAgainButton pastOrder={order} />
+                  <Link 
+                    to={`/order-tracking/${order.id}`}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors w-full md:w-auto"
+                  >
+                    Track Order <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
               </div>
             </div>
           ))}

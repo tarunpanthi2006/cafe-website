@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Leaf, Clock, ShieldCheck, Sparkles, ChevronRight, ShoppingBag } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCartStore } from '../store/useCartStore';
+import RecentlyViewed from '../components/RecentlyViewed';
 
 export default function Home() {
   const [popularItems, setPopularItems] = useState([]);
@@ -105,6 +106,11 @@ export default function Home() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Recently Viewed Section (Horizontal) */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <RecentlyViewed />
       </section>
 
       {/* Trust Badges */}
